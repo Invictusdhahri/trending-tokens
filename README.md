@@ -19,7 +19,7 @@ A TypeScript-based tool to fetch and monitor trending token pools on Solana bloc
 
 Example output:
 ![Example Output](./example.png)
-(https://coin-images.coingecko.com/coins/images/54690/large/pwease.png?1741595213)
+![Example Output](https://coin-images.coingecko.com/coins/images/54690/large/pwease.png?1741595213)
 
 You can also see a sample JSON response:
 ```json
