@@ -1,0 +1,25 @@
+{
+  "name": "trending-tokens",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Invictusdhahri/trending-tokens.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Invictusdhahri/trending-tokens/issues"
+  },
+  "homepage": "https://github.com/Invictusdhahri/trending-tokens#readme",
+  "description": "",
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "cross-fetch": "^4.1.0",
+    "typescript": "^5.8.3"
+  }
+}
