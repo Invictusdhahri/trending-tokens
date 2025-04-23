@@ -23,14 +23,16 @@ Example output:
 You can also see a sample JSON response:
 ```json
 {
-  "coin_name": "BONK",
-  "coin_price": "0.000012345",
-  "market_cap": "1234567",
-  "volume_24h": "987654",
-  "dex_name": "Raydium",
-  "liquidity": "500000",
-  "token_address": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
-}
+    "coin_name": "pwease ",
+    "coin_price": "0.00643694808709027",
+    "market_cap": "6491700.17328602",
+    "volume_24h": "2383274.81130946",
+    "dex_name": "Raydium",
+    "liquidity": "920081.0507",
+    "token_address": "CniPCE4b3s8gSUPhUiyMjXnytrEqUrMfSsnbBjLCpump",
+    "image_url": "https://coin-images.coingecko.com/coins/images/54690/large/pwease.png?1741595213",
+    "holders": 22272
+  }
 ```
 
 ## Installation
