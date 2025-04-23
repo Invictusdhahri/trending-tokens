@@ -39,6 +39,17 @@ interface TrendingPool {
   };
 }
 
+interface TokenInfo {
+  data: {
+    attributes: {
+      image_url: string;
+      holders: {
+        count: number;
+      };
+    };
+  };
+}
+
 interface SimplifiedPoolInfo {
   coin_name: string;
   coin_price: string;
@@ -47,6 +58,8 @@ interface SimplifiedPoolInfo {
   dex_name: string;
   liquidity: string;
   token_address: string;
+  image_url: string;
+  holders: number;
 }
 
 interface TrendingPoolsResponse {
@@ -70,18 +83,42 @@ export async function getTrendingPools(): Promise<SimplifiedPoolInfo[]> {
 
   const data: TrendingPoolsResponse = await response.json();
   
-  return data.data
+  return Promise.all(data.data
     .filter(pool => {
       const liquidity = parseFloat(pool.attributes.reserve_in_usd || '0');
       return liquidity >= 1000;
     })
-    .map(pool => {
+    .map(async pool => {
       const poolName = pool.attributes.name || '';
       const [baseToken, quoteToken] = poolName.split('/');
       const coinName = pool.attributes.base_token_name || baseToken || 'Unknown';
       const marketCap = pool.attributes.market_cap_usd || pool.attributes.fdv_usd || '0';
       const dexId = pool.relationships?.dex?.data?.id || '';
       let dexName = getDexName(dexId);
+      const tokenAddress = pool.attributes.base_token_address || pool.relationships?.base_token?.data?.id?.replace('solana_', '') || '';
+      
+      // Fetch token info including image and holders
+      let imageUrl = '';
+      let holdersCount = 0;
+      
+      try {
+        const tokenInfoResponse = await fetch(
+          `https://api.geckoterminal.com/api/v2/networks/solana/tokens/${tokenAddress}/info`,
+          {
+            headers: {
+              'accept': 'application/json'
+            }
+          }
+        );
+        
+        if (tokenInfoResponse.ok) {
+          const tokenInfo: TokenInfo = await tokenInfoResponse.json();
+          imageUrl = tokenInfo.data.attributes.image_url || '';
+          holdersCount = tokenInfo.data.attributes.holders?.count || 0;
+        }
+      } catch (error) {
+        console.error(`Failed to fetch token info for ${tokenAddress}:`, error);
+      }
       
       return {
         coin_name: coinName,
@@ -90,9 +127,11 @@ export async function getTrendingPools(): Promise<SimplifiedPoolInfo[]> {
         volume_24h: pool.attributes.volume_usd?.h24 || '0',
         dex_name: dexName,
         liquidity: pool.attributes.reserve_in_usd || '0',
-        token_address: pool.attributes.base_token_address || pool.relationships?.base_token?.data?.id?.replace('solana_', '') || ''
+        token_address: tokenAddress,
+        image_url: imageUrl,
+        holders: holdersCount
       };
-    });
+    }));
 }
 
 function getDexName(dexId: string): string {
@@ -135,7 +174,7 @@ function getDexName(dexId: string): string {
   };
 
   const normalizedDexId = dexId.toLowerCase().trim();
-  console.log('Normalized DEX ID:', normalizedDexId);
+  // console.log('Normalized DEX ID:', normalizedDexId);
   
   // Try exact match first
   if (dexNames[normalizedDexId]) {
