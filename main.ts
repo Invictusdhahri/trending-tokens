@@ -70,24 +70,29 @@ export async function getTrendingPools(): Promise<SimplifiedPoolInfo[]> {
 
   const data: TrendingPoolsResponse = await response.json();
   
-  return data.data.map(pool => {
-    const poolName = pool.attributes.name || '';
-    const [baseToken, quoteToken] = poolName.split('/');
-    const coinName = pool.attributes.base_token_name || baseToken || 'Unknown';
-    const marketCap = pool.attributes.market_cap_usd || pool.attributes.fdv_usd || '0';
-    const dexId = pool.relationships?.dex?.data?.id || '';
-    let dexName = getDexName(dexId);
-    
-    return {
-      coin_name: coinName,
-      coin_price: pool.attributes.base_token_price_usd || '0',
-      market_cap: marketCap,
-      volume_24h: pool.attributes.volume_usd?.h24 || '0',
-      dex_name: dexName,
-      liquidity: pool.attributes.reserve_in_usd || '0',
-      token_address: pool.attributes.base_token_address || pool.relationships?.base_token?.data?.id?.replace('solana_', '') || ''
-    };
-  });
+  return data.data
+    .filter(pool => {
+      const liquidity = parseFloat(pool.attributes.reserve_in_usd || '0');
+      return liquidity >= 1000;
+    })
+    .map(pool => {
+      const poolName = pool.attributes.name || '';
+      const [baseToken, quoteToken] = poolName.split('/');
+      const coinName = pool.attributes.base_token_name || baseToken || 'Unknown';
+      const marketCap = pool.attributes.market_cap_usd || pool.attributes.fdv_usd || '0';
+      const dexId = pool.relationships?.dex?.data?.id || '';
+      let dexName = getDexName(dexId);
+      
+      return {
+        coin_name: coinName,
+        coin_price: pool.attributes.base_token_price_usd || '0',
+        market_cap: marketCap,
+        volume_24h: pool.attributes.volume_usd?.h24 || '0',
+        dex_name: dexName,
+        liquidity: pool.attributes.reserve_in_usd || '0',
+        token_address: pool.attributes.base_token_address || pool.relationships?.base_token?.data?.id?.replace('solana_', '') || ''
+      };
+    });
 }
 
 function getDexName(dexId: string): string {
