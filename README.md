@@ -14,6 +14,8 @@ A TypeScript-based tool to fetch and monitor trending token pools on Solana bloc
   - DEX name (supports multiple Solana DEXes)
   - Liquidity
   - Token address
+  -Image 
+  -Holders
 
 ## Example
 
