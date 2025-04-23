@@ -67,71 +67,100 @@ interface TrendingPoolsResponse {
   included?: any[];
 }
 
-export async function getTrendingPools(): Promise<SimplifiedPoolInfo[]> {
-  const response = await fetch(
-    'https://api.geckoterminal.com/api/v2/networks/solana/trending_pools?include=included&page=1&duration=24h',
-    {
-      headers: {
-        'accept': 'application/json'
-      }
-    }
-  );
+// Cache for token info to avoid redundant API calls
+const tokenInfoCache: Map<string, { imageUrl: string; holders: number }> = new Map();
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch trending pools');
+export async function getTrendingPools(): Promise<SimplifiedPoolInfo[]> {
+  try {
+    const response = await fetch(
+      'https://api.geckoterminal.com/api/v2/networks/solana/trending_pools?include=included&page=1&duration=24h',
+      {
+        headers: {
+          'accept': 'application/json'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch trending pools: ${response.status}`);
+    }
+
+    const data: TrendingPoolsResponse = await response.json();
+    
+    // Process pools in parallel with a limit of 5 concurrent requests
+    const batchSize = 5;
+    const results: SimplifiedPoolInfo[] = [];
+    const filteredPools = data.data.filter(pool => 
+      parseFloat(pool.attributes.reserve_in_usd || '0') >= 1000
+    );
+
+    for (let i = 0; i < filteredPools.length; i += batchSize) {
+      const batch = filteredPools.slice(i, i + batchSize);
+      const batchResults = await Promise.all(batch.map(processPool));
+      results.push(...batchResults);
+    }
+
+    return results;
+  } catch (error) {
+    console.error('Error fetching trending pools:', error);
+    throw error;
+  }
+}
+
+async function processPool(pool: TrendingPool): Promise<SimplifiedPoolInfo> {
+  const poolName = pool.attributes.name || '';
+  const [baseToken] = poolName.split('/');
+  const coinName = pool.attributes.base_token_name || baseToken || 'Unknown';
+  const marketCap = pool.attributes.market_cap_usd || pool.attributes.fdv_usd || '0';
+  const dexId = pool.relationships?.dex?.data?.id || '';
+  const dexName = getDexName(dexId);
+  const tokenAddress = pool.attributes.base_token_address || 
+    pool.relationships?.base_token?.data?.id?.replace('solana_', '') || '';
+
+  let tokenInfo = tokenInfoCache.get(tokenAddress);
+
+  if (!tokenInfo) {
+    tokenInfo = await fetchTokenInfo(tokenAddress);
+    tokenInfoCache.set(tokenAddress, tokenInfo);
   }
 
-  const data: TrendingPoolsResponse = await response.json();
-  
-  return Promise.all(data.data
-    .filter(pool => {
-      const liquidity = parseFloat(pool.attributes.reserve_in_usd || '0');
-      return liquidity >= 1000;
-    })
-    .map(async pool => {
-      const poolName = pool.attributes.name || '';
-      const [baseToken, quoteToken] = poolName.split('/');
-      const coinName = pool.attributes.base_token_name || baseToken || 'Unknown';
-      const marketCap = pool.attributes.market_cap_usd || pool.attributes.fdv_usd || '0';
-      const dexId = pool.relationships?.dex?.data?.id || '';
-      let dexName = getDexName(dexId);
-      const tokenAddress = pool.attributes.base_token_address || pool.relationships?.base_token?.data?.id?.replace('solana_', '') || '';
-      
-      // Fetch token info including image and holders
-      let imageUrl = '';
-      let holdersCount = 0;
-      
-      try {
-        const tokenInfoResponse = await fetch(
-          `https://api.geckoterminal.com/api/v2/networks/solana/tokens/${tokenAddress}/info`,
-          {
-            headers: {
-              'accept': 'application/json'
-            }
-          }
-        );
-        
-        if (tokenInfoResponse.ok) {
-          const tokenInfo: TokenInfo = await tokenInfoResponse.json();
-          imageUrl = tokenInfo.data.attributes.image_url || '';
-          holdersCount = tokenInfo.data.attributes.holders?.count || 0;
+  return {
+    coin_name: coinName,
+    coin_price: pool.attributes.base_token_price_usd || '0',
+    market_cap: marketCap,
+    volume_24h: pool.attributes.volume_usd?.h24 || '0',
+    dex_name: dexName,
+    liquidity: pool.attributes.reserve_in_usd || '0',
+    token_address: tokenAddress,
+    image_url: tokenInfo.imageUrl,
+    holders: tokenInfo.holders
+  };
+}
+
+async function fetchTokenInfo(tokenAddress: string): Promise<{ imageUrl: string; holders: number }> {
+  try {
+    const response = await fetch(
+      `https://api.geckoterminal.com/api/v2/networks/solana/tokens/${tokenAddress}/info`,
+      {
+        headers: {
+          'accept': 'application/json'
         }
-      } catch (error) {
-        console.error(`Failed to fetch token info for ${tokenAddress}:`, error);
       }
-      
-      return {
-        coin_name: coinName,
-        coin_price: pool.attributes.base_token_price_usd || '0',
-        market_cap: marketCap,
-        volume_24h: pool.attributes.volume_usd?.h24 || '0',
-        dex_name: dexName,
-        liquidity: pool.attributes.reserve_in_usd || '0',
-        token_address: tokenAddress,
-        image_url: imageUrl,
-        holders: holdersCount
-      };
-    }));
+    );
+    
+    if (!response.ok) {
+      return { imageUrl: '', holders: 0 };
+    }
+
+    const tokenInfo: TokenInfo = await response.json();
+    return {
+      imageUrl: tokenInfo.data.attributes.image_url || '',
+      holders: tokenInfo.data.attributes.holders?.count || 0
+    };
+  } catch (error) {
+    console.error(`Failed to fetch token info for ${tokenAddress}:`, error);
+    return { imageUrl: '', holders: 0 };
+  }
 }
 
 function getDexName(dexId: string): string {
@@ -201,7 +230,6 @@ async function main() {
   }
 }
 
-// Run the main function
 main();
 
 export default getTrendingPools;
